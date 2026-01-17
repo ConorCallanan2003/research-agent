@@ -315,8 +315,8 @@ def search_store(store_name: str, query: str, k: int = 10) -> list[dict]:
                     "distance": round(float(distance), 4),
                 })
 
-    # Sort by distance (lowest = most similar)
-    results.sort(key=lambda x: x["distance"])
+    # Sort by distance (most similar first)
+    results.sort(key=lambda x: -x["distance"])
     return results
 
 
