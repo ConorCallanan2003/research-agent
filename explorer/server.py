@@ -17,7 +17,7 @@ from research_agent.embeddings import QwenEmbedder
 
 app = FastAPI(title="Knowledge Store Explorer")
 
-# Lazy-loaded embedder for search
+# Embedder singleton
 _embedder: QwenEmbedder | None = None
 
 
@@ -27,6 +27,22 @@ def get_embedder() -> QwenEmbedder:
     if _embedder is None:
         _embedder = QwenEmbedder()
     return _embedder
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Load the embedding model in background on startup."""
+    import threading
+
+    def load_embedder():
+        print("Loading embedding model in background...")
+        embedder = get_embedder()
+        if not embedder.is_loaded:
+            embedder._load_model()
+        print(f"Embedding model loaded on {embedder.device}")
+
+    thread = threading.Thread(target=load_embedder, daemon=True)
+    thread.start()
 
 # Templates directory
 TEMPLATES_DIR = Path(__file__).parent / "templates"
