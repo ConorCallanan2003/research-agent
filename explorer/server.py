@@ -13,8 +13,20 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from research_agent.config import Config
+from research_agent.embeddings import QwenEmbedder
 
 app = FastAPI(title="Knowledge Store Explorer")
+
+# Lazy-loaded embedder for search
+_embedder: QwenEmbedder | None = None
+
+
+def get_embedder() -> QwenEmbedder:
+    """Get or create the embedder singleton."""
+    global _embedder
+    if _embedder is None:
+        _embedder = QwenEmbedder()
+    return _embedder
 
 # Templates directory
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -239,6 +251,59 @@ def get_neighbors(store_name: str, doc_id: str, k: int = 10) -> list[dict]:
     return neighbor_findings
 
 
+def search_store(store_name: str, query: str, k: int = 10) -> list[dict]:
+    """Semantic search across findings in a store."""
+    stores_dir = get_stores_dir()
+    index_path = stores_dir / f"{store_name}.index"
+
+    if not index_path.exists():
+        return []
+
+    # Get total count
+    with get_store_connection(store_name) as conn:
+        cursor = conn.execute("SELECT COUNT(*) FROM embeddings")
+        total_count = cursor.fetchone()[0]
+
+    if total_count == 0:
+        return []
+
+    # Embed the query
+    embedder = get_embedder()
+    query_vector = embedder.embed_single(query, is_query=True)
+
+    # Load index and search
+    dimension = Config.EMBEDDING_DIM
+    index = hnswlib.Index(space="cosine", dim=dimension)
+    index.load_index(str(index_path))
+
+    search_k = min(k, total_count)
+    labels, distances = index.knn_query(np.array([query_vector], dtype=np.float32), k=search_k)
+
+    # Get the findings
+    results = []
+    with get_store_connection(store_name) as conn:
+        for label, distance in zip(labels[0], distances[0]):
+            cursor = conn.execute(
+                "SELECT doc_id, text, metadata, created_at FROM embeddings WHERE id = ?",
+                (int(label),),
+            )
+            row = cursor.fetchone()
+            if row:
+                metadata = json.loads(row[2]) if row[2] else {}
+                results.append({
+                    "doc_id": row[0],
+                    "text_preview": row[1][:200] + "..." if len(row[1]) > 200 else row[1],
+                    "title": metadata.get("title", "Untitled"),
+                    "finding_type": metadata.get("finding_type", "unknown"),
+                    "source_url": metadata.get("source_url", ""),
+                    "distance": round(float(distance), 4),
+                })
+
+    # Sort by distance (lowest = most similar)
+    results.sort(key=lambda x: x["distance"])
+    return results
+
+
 # --- Routes ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -303,6 +368,24 @@ async def finding_neighbors(request: Request, store_name: str, doc_id: str, k: i
             "request": request,
             "store_name": store_name,
             "neighbors": neighbors,
+        },
+    )
+
+
+@app.get("/stores/{store_name}/search", response_class=HTMLResponse)
+async def store_search(request: Request, store_name: str, q: str = "", k: int = 10):
+    """Search findings in a store (htmx partial)."""
+    if not q.strip():
+        return HTMLResponse("<p><em>Enter a search query above.</em></p>")
+
+    results = search_store(store_name, q, k=k)
+    return templates.TemplateResponse(
+        "partials/search_results.html",
+        {
+            "request": request,
+            "store_name": store_name,
+            "query": q,
+            "results": results,
         },
     )
 

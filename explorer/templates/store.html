@@ -8,10 +8,24 @@
 <h2>{{ store_name }}</h2>
 <p>{{ total_count }} findings from {{ sources|length }} sources</p>
 
+<!-- Search -->
+<h3>Search</h3>
+<form hx-get="/stores/{{ store_name }}/search" hx-target="#search-results" hx-trigger="submit">
+    <input type="text" name="q" placeholder="Semantic search..." size="40">
+    <input type="hidden" name="k" value="10">
+    <button type="submit">Search</button>
+</form>
+<div id="search-results">
+    <p><em>Enter a search query above.</em></p>
+</div>
+
+<hr>
+
 <table width="100%">
     <tr valign="top">
         <td width="75%">
             <!-- Main content: Findings table -->
+            <h3>All Findings</h3>
             {% if findings %}
             <table border="1" width="100%">
                 <thead>

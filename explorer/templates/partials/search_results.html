@@ -1,0 +1,26 @@
+<p>Found {{ results|length }} results for "{{ query }}"</p>
+
+{% if results %}
+<table border="1" width="100%">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Title</th>
+            <th>Text Preview</th>
+            <th>Distance</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for result in results %}
+        <tr>
+            <td><code>{{ result.finding_type }}</code></td>
+            <td><a href="/stores/{{ store_name }}/findings/{{ result.doc_id }}">{{ result.title }}</a></td>
+            <td>{{ result.text_preview }}</td>
+            <td>{{ result.distance }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No results found.</em></p>
+{% endif %}
