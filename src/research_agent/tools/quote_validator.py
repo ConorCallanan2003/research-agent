@@ -1,8 +1,9 @@
 """Validation for direct quotes against source content."""
 
-import difflib
 import re
 from dataclasses import dataclass
+
+from rapidfuzz import fuzz
 
 
 @dataclass
@@ -64,6 +65,7 @@ def find_fuzzy_match(
     Find a fuzzy match of the quote in the source text.
 
     Uses a sliding window approach to find the best matching substring.
+    Uses RapidFuzz (C++ implementation) for fast fuzzy matching.
 
     Returns:
         Tuple of (matched_text, match_ratio) or (None, 0.0) if no match above threshold.
@@ -92,17 +94,18 @@ def find_fuzzy_match(
         for i in range(len(source_words_original) - window_size + 1):
             window_normalized = ' '.join(source_words_normalized[i:i + window_size])
 
-            # Use SequenceMatcher for similarity
-            ratio = difflib.SequenceMatcher(
-                None,
-                normalized_quote,
-                window_normalized
-            ).ratio()
+            # Use RapidFuzz for fast similarity (returns 0-100, convert to 0-1)
+            ratio = fuzz.ratio(normalized_quote, window_normalized) / 100.0
 
             if ratio > best_ratio:
                 best_ratio = ratio
                 best_start = i
                 best_end = i + window_size
+
+                # Early termination if we find a very good match
+                if ratio >= 0.98:
+                    best_match = ' '.join(source_words_original[best_start:best_end])
+                    return best_match, best_ratio
 
     if best_ratio >= min_ratio:
         # Extract the original text (preserving formatting)
