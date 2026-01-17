@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Knowledge Stores{% endblock %}
+
+{% block content %}
+<h2>Knowledge Stores</h2>
+
+{% if stores %}
+<table border="1">
+    <thead>
+        <tr>
+            <th>Store Name</th>
+            <th>Findings</th>
+            <th>Created</th>
+            <th>Last Updated</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for store in stores %}
+        <tr>
+            <td><a href="/stores/{{ store.name }}">{{ store.name }}</a></td>
+            <td>{{ store.finding_count }}</td>
+            <td>{{ store.created }}</td>
+            <td>{{ store.updated }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No knowledge stores found.</em></p>
+<p>Run a research session to create one:</p>
+<pre>python -m research_agent.main briefs/your_brief.json</pre>
+{% endif %}
+{% endblock %}

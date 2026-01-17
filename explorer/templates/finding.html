@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}{{ finding.title }} - Finding{% endblock %}
+
+{% block content %}
+<p><a href="/stores/{{ store_name }}">&larr; Back to {{ store_name }}</a></p>
+
+<h2>{{ finding.title }}</h2>
+
+<fieldset>
+    <legend>Metadata</legend>
+    <dl>
+        <dt>Type</dt>
+        <dd><code>{{ finding.finding_type }}</code></dd>
+
+        <dt>Source URL</dt>
+        <dd>
+            {% if finding.source_url %}
+            <a href="{{ finding.source_url }}" target="_blank">{{ finding.source_url }}</a>
+            {% else %}
+            <em>N/A</em>
+            {% endif %}
+        </dd>
+
+        {% if finding.author %}
+        <dt>Author</dt>
+        <dd>{{ finding.author }}</dd>
+        {% endif %}
+
+        {% if finding.publication_date %}
+        <dt>Publication Date</dt>
+        <dd>{{ finding.publication_date }}</dd>
+        {% endif %}
+
+        {% if finding.accessed_date %}
+        <dt>Accessed</dt>
+        <dd>{{ finding.accessed_date }}</dd>
+        {% endif %}
+
+        <dt>Stored</dt>
+        <dd>{{ finding.created_at }}</dd>
+
+        <dt>Doc ID</dt>
+        <dd><code>{{ finding.doc_id }}</code></dd>
+    </dl>
+</fieldset>
+
+<fieldset>
+    <legend>Content</legend>
+    <blockquote>
+        <pre style="white-space: pre-wrap; font-family: inherit;">{{ finding.text }}</pre>
+    </blockquote>
+</fieldset>
+
+{% if finding.relevance_notes %}
+<fieldset>
+    <legend>Relevance Notes</legend>
+    <p>{{ finding.relevance_notes }}</p>
+</fieldset>
+{% endif %}
+
+<fieldset>
+    <legend>Similar Findings</legend>
+    <div
+        hx-get="/stores/{{ store_name }}/findings/{{ finding.doc_id }}/neighbors?k=10"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+    >
+        <p><em>Loading neighbors...</em></p>
+    </div>
+</fieldset>
+{% endblock %}

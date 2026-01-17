@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}{{ store_name }} - Knowledge Store{% endblock %}
+
+{% block content %}
+<p><a href="/">&larr; All Stores</a></p>
+
+<h2>{{ store_name }}</h2>
+<p>{{ total_count }} findings from {{ sources|length }} sources</p>
+
+<table width="100%">
+    <tr valign="top">
+        <td width="75%">
+            <!-- Main content: Findings table -->
+            {% if findings %}
+            <table border="1" width="100%">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Text Preview</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for finding in findings %}
+                    <tr>
+                        <td><code>{{ finding.finding_type }}</code></td>
+                        <td><a href="/stores/{{ store_name }}/findings/{{ finding.doc_id }}">{{ finding.title }}</a></td>
+                        <td>{{ finding.text_preview }}</td>
+                        <td>{{ finding.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <p>
+                {% if page > 1 %}
+                <a href="/stores/{{ store_name }}?page={{ page - 1 }}">&larr; Previous</a>
+                {% endif %}
+
+                Page {{ page }} of {{ total_pages }}
+
+                {% if page < total_pages %}
+                <a href="/stores/{{ store_name }}?page={{ page + 1 }}">Next &rarr;</a>
+                {% endif %}
+            </p>
+            {% else %}
+            <p><em>No findings in this store.</em></p>
+            {% endif %}
+        </td>
+        <td width="25%">
+            <!-- Side panel: Sources -->
+            <h3>Sources ({{ sources|length }})</h3>
+            {% if sources %}
+            <ul>
+                {% for source in sources %}
+                <li>
+                    <a href="{{ source.url }}" target="_blank" title="{{ source.url }}">{{ source.title }}</a>
+                    <br><small>({{ source.count }} finding{{ 's' if source.count != 1 else '' }})</small>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p><em>No sources.</em></p>
+            {% endif %}
+        </td>
+    </tr>
+</table>
+{% endblock %}

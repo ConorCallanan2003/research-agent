@@ -1,0 +1,24 @@
+{% if neighbors %}
+<table border="1">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Title</th>
+            <th>Preview</th>
+            <th>Distance</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for neighbor in neighbors %}
+        <tr>
+            <td><code>{{ neighbor.finding_type }}</code></td>
+            <td><a href="/stores/{{ store_name }}/findings/{{ neighbor.doc_id }}">{{ neighbor.title }}</a></td>
+            <td>{{ neighbor.text_preview }}</td>
+            <td>{{ neighbor.distance }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No similar findings found.</em></p>
+{% endif %}

@@ -1,0 +1,20 @@
+{
+  "topic": "Large Language Model Agents",
+  "detail_level": "moderate",
+  "time_focus": {
+    "current_weight": 0.7,
+    "historical_weight": 0.3
+  },
+  "specific_questions": [
+    "What are the main architectural patterns for LLM agents?",
+    "How do tool-use capabilities work in modern LLM agents?",
+    "What are the current limitations of LLM agents?",
+    "What frameworks exist for building LLM agents?"
+  ],
+  "excluded_sources": [
+    "medium.com",
+    "quora.com"
+  ],
+  "output_format": "markdown",
+  "max_sources": 15
+}

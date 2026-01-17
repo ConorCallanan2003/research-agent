@@ -1,0 +1,77 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Claude Code
+.claude/
+
+# Debug files
+debug_*.png
+
+# Generated research reports (keep README and ROADMAP)
+*_moderate.md
+*_comprehensive.md
+*_overview.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Knowledge stores (contain research data, can be large)
+knowledge_stores/*.db
+knowledge_stores/*.index
+
+# Research briefs (keep only example)
+briefs/*
+!briefs/example_brief.json
+
+# Generated reports (optional - uncomment if you don't want to track these)
+# *.md
+# !README.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Torch/model cache (can be large)
+*.pt
+*.pth
+*.bin
+.cache/
