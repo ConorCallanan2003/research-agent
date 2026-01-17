@@ -40,6 +40,8 @@ class BrowserTool:
         self._headless = headless if headless is not None else Config.BROWSER_HEADLESS
         self._max_concurrent = max_concurrent_pages
         self._semaphore: asyncio.Semaphore | None = None
+        self._page_cache: dict[str, PageContent] = {}  # URL -> cached content
+        self._url_locks: dict[str, asyncio.Lock] = {}  # Per-URL locks to prevent duplicate fetches
 
     async def initialize(self) -> None:
         """Launch browser instance."""
@@ -172,94 +174,111 @@ class BrowserTool:
         Returns:
             PageContent with extracted text and metadata
         """
-        if not self._browser:
-            await self.initialize()
+        # Check cache first (fast path, no lock needed)
+        if url in self._page_cache:
+            return self._page_cache[url]
 
-        timeout = timeout_ms or Config.PAGE_TIMEOUT_MS
+        # Get or create a lock for this URL to prevent duplicate fetches
+        if url not in self._url_locks:
+            self._url_locks[url] = asyncio.Lock()
 
-        async with self._semaphore:
-            page = await self._create_page()
-            try:
-                await page.goto(url, timeout=timeout)
+        async with self._url_locks[url]:
+            # Check cache again (another request may have populated it while we waited)
+            if url in self._page_cache:
+                return self._page_cache[url]
 
-                if wait_for_js:
-                    # Wait for content to stabilize
-                    await page.wait_for_load_state("networkidle", timeout=timeout)
+            if not self._browser:
+                await self.initialize()
 
-                # Extract title
-                title = await page.title()
+            timeout = timeout_ms or Config.PAGE_TIMEOUT_MS
 
-                # Extract main text content
-                text_content = await page.evaluate(
-                    """
-                    () => {
-                        // Remove script and style elements
-                        const scripts = document.querySelectorAll('script, style, noscript, nav, footer, header');
-                        scripts.forEach(el => el.remove());
+            async with self._semaphore:
+                page = await self._create_page()
+                try:
+                    await page.goto(url, timeout=timeout)
 
-                        // Try to find main content area
-                        const mainSelectors = ['main', 'article', '[role="main"]', '.content', '#content', '.post', '.article'];
-                        let mainContent = null;
+                    if wait_for_js:
+                        # Wait for content to stabilize
+                        await page.wait_for_load_state("networkidle", timeout=timeout)
 
-                        for (const selector of mainSelectors) {
-                            mainContent = document.querySelector(selector);
-                            if (mainContent) break;
-                        }
+                    # Extract title
+                    title = await page.title()
 
-                        // Fall back to body if no main content found
-                        const target = mainContent || document.body;
+                    # Extract main text content
+                    text_content = await page.evaluate(
+                        """
+                        () => {
+                            // Remove script and style elements
+                            const scripts = document.querySelectorAll('script, style, noscript, nav, footer, header');
+                            scripts.forEach(el => el.remove());
 
-                        // Get text content and clean it up
-                        let text = target.innerText || target.textContent || '';
+                            // Try to find main content area
+                            const mainSelectors = ['main', 'article', '[role="main"]', '.content', '#content', '.post', '.article'];
+                            let mainContent = null;
 
-                        // Clean up whitespace
-                        text = text.replace(/\\s+/g, ' ').trim();
-
-                        return text;
-                    }
-                """
-                )
-
-                # Truncate if too long
-                if len(text_content) > Config.MAX_CONTENT_LENGTH:
-                    text_content = text_content[: Config.MAX_CONTENT_LENGTH] + "... [truncated]"
-
-                # Extract links
-                links = await page.evaluate(
-                    """
-                    () => {
-                        const links = [];
-                        const anchors = document.querySelectorAll('a[href^="http"]');
-
-                        for (const a of anchors) {
-                            if (a.textContent && a.textContent.trim()) {
-                                links.push({
-                                    text: a.textContent.trim().substring(0, 100),
-                                    href: a.href
-                                });
+                            for (const selector of mainSelectors) {
+                                mainContent = document.querySelector(selector);
+                                if (mainContent) break;
                             }
+
+                            // Fall back to body if no main content found
+                            const target = mainContent || document.body;
+
+                            // Get text content and clean it up
+                            let text = target.innerText || target.textContent || '';
+
+                            // Clean up whitespace
+                            text = text.replace(/\\s+/g, ' ').trim();
+
+                            return text;
                         }
+                    """
+                    )
 
-                        return links.slice(0, 50);  // Limit to 50 links
-                    }
-                """
-                )
+                    # Truncate if too long
+                    if len(text_content) > Config.MAX_CONTENT_LENGTH:
+                        text_content = text_content[: Config.MAX_CONTENT_LENGTH] + "... [truncated]"
 
-                return PageContent(
-                    url=url,
-                    title=title,
-                    text_content=text_content,
-                    links=links,
-                    extraction_timestamp=datetime.utcnow().isoformat(),
-                )
+                    # Extract links
+                    links = await page.evaluate(
+                        """
+                        () => {
+                            const links = [];
+                            const anchors = document.querySelectorAll('a[href^="http"]');
 
-            except Exception as e:
-                return PageContent(
-                    url=url,
-                    title="Error loading page",
-                    text_content=f"Failed to load page: {str(e)}",
-                    links=[],
-                    extraction_timestamp=datetime.utcnow().isoformat(),
-                )
-            finally:
-                await page.close()
+                            for (const a of anchors) {
+                                if (a.textContent && a.textContent.trim()) {
+                                    links.push({
+                                        text: a.textContent.trim().substring(0, 100),
+                                        href: a.href
+                                    });
+                                }
+                            }
+
+                            return links.slice(0, 50);  // Limit to 50 links
+                        }
+                    """
+                    )
+
+                    result = PageContent(
+                        url=url,
+                        title=title,
+                        text_content=text_content,
+                        links=links,
+                        extraction_timestamp=datetime.utcnow().isoformat(),
+                    )
+                    # Cache successful fetches
+                    self._page_cache[url] = result
+                    return result
+
+                except Exception as e:
+                    # Don't cache errors - allow retry
+                    return PageContent(
+                        url=url,
+                        title="Error loading page",
+                        text_content=f"Failed to load page: {str(e)}",
+                        links=[],
+                        extraction_timestamp=datetime.utcnow().isoformat(),
+                    )
+                finally:
+                    await page.close()
