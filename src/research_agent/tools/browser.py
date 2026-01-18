@@ -7,6 +7,7 @@ from datetime import datetime
 from urllib.parse import quote_plus
 
 from playwright.async_api import Browser, Page, async_playwright
+from playwright_stealth.stealth import Stealth
 
 from research_agent.config import Config
 
@@ -53,13 +54,26 @@ class BrowserTool:
         self._semaphore = asyncio.Semaphore(self._max_concurrent)
 
     async def _create_page(self) -> Page:
-        """Create a new page with standard configuration."""
+        """Create a new page with standard configuration and stealth techniques."""
         page = await self._browser.new_page()
-        await page.set_extra_http_headers(
-            {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
+
+        # Set realistic viewport
+        await page.set_viewport_size({"width": 1920, "height": 1080})
+
+        # Set comprehensive headers
+        await page.set_extra_http_headers({
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        })
+
+        # Apply comprehensive stealth techniques using playwright-stealth
+        stealth_config = Stealth(
+            navigator_platform_override="MacIntel",  # Match our user agent
+            navigator_user_agent_override="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         )
+        await stealth_config.apply_stealth_async(page)
+
         return page
 
     async def close(self) -> None:
@@ -82,7 +96,7 @@ class BrowserTool:
         self, query: str, num_results: int = 10
     ) -> list[SearchResult]:
         """
-        Execute web search using DuckDuckGo and return results.
+        Execute web search using Yahoo and return results.
 
         Args:
             query: Search query
@@ -97,38 +111,51 @@ class BrowserTool:
         async with self._semaphore:
             page = await self._create_page()
             try:
-                # Build DuckDuckGo search URL
+                # Build Yahoo search URL
                 encoded_query = quote_plus(query)
-                search_url = f"https://duckduckgo.com/?q={encoded_query}&t=h_&ia=web"
+                search_url = f"https://search.yahoo.com/search?p={encoded_query}"
 
                 await page.goto(search_url, timeout=Config.PAGE_TIMEOUT_MS)
 
+                # Handle Yahoo's privacy consent dialog if it appears
+                try:
+                    accept_button = page.locator('button:has-text("Accept all")')
+                    if await accept_button.is_visible(timeout=2000):
+                        await accept_button.click()
+                        await asyncio.sleep(1)
+                except Exception:
+                    # No consent dialog or already accepted
+                    pass
+
                 # Wait for search results to load
-                await page.wait_for_selector('[data-testid="result"]', timeout=10000)
+                await page.wait_for_selector('.algo', timeout=10000)
 
                 # Give the page a moment to fully render
                 await asyncio.sleep(0.5)
 
-                # Extract search results from DuckDuckGo
+                # Extract search results from Yahoo
                 results = await page.evaluate(
                     """
                     () => {
                         const results = [];
                         const seen = new Set();
 
-                        // DuckDuckGo result items
-                        const items = document.querySelectorAll('[data-testid="result"]');
+                        // Yahoo result items
+                        const items = document.querySelectorAll('.algo');
 
                         for (const item of items) {
-                            // Get the title link
-                            const titleLink = item.querySelector('a[data-testid="result-title-a"]');
-                            const snippetEl = item.querySelector('[data-testid="result-snippet"]');
+                            // Get the title link - try multiple selectors
+                            let titleLink = item.querySelector('h3 a');
+                            if (!titleLink) titleLink = item.querySelector('.title a');
+                            if (!titleLink) titleLink = item.querySelector('a');
+
+                            const snippetEl = item.querySelector('.compText, .lh-16, p');
 
                             if (titleLink) {
                                 const url = titleLink.href;
 
-                                // Skip duplicates and DuckDuckGo internal links
-                                if (!url || url.includes('duckduckgo.com') || seen.has(url)) continue;
+                                // Skip duplicates and Yahoo internal links
+                                if (!url || url.includes('yahoo.com/search') || seen.has(url)) continue;
                                 seen.add(url);
 
                                 results.push({

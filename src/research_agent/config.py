@@ -28,7 +28,7 @@ class Config:
     EMBEDDING_DIM: int = 2560  # Qwen3-Embedding-4B dimension
 
     # Browser configuration
-    # Default to non-headless as DuckDuckGo blocks headless browsers
+    # Headless mode supported with playwright-stealth (Yahoo search + consent dialog handling)
     BROWSER_HEADLESS: bool = os.getenv("BROWSER_HEADLESS", "false").lower() == "true"
     PAGE_TIMEOUT_MS: int = int(os.getenv("PAGE_TIMEOUT_MS", "30000"))
 

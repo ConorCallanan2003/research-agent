@@ -102,6 +102,22 @@ Options:
   --no-thinking         Disable extended thinking (faster but less capable)
 ```
 
+## ⚙️ Configuration
+
+Set environment variables in `.env`:
+
+```bash
+# Required
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional
+BROWSER_HEADLESS=true           # Run browser in headless mode (default: false)
+KNOWLEDGE_STORE_DIR=./stores    # Knowledge store directory
+CLAUDE_MODEL=claude-sonnet-4-5-20250929
+```
+
+**Headless Mode:** Now fully supported with `playwright-stealth`! Yahoo search works reliably in headless mode with automated consent dialog handling.
+
 ## 🖥️ Knowledge Store Explorer
 
 Browse your research findings with a local web UI:
